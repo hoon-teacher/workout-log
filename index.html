@@ -36,7 +36,7 @@ h1,h2,h3{margin:0}
 .mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
 .disp{font-family:Archivo,Pretendard,sans-serif;font-weight:800;letter-spacing:-.02em}
 
-header{background:var(--ink);color:#fff;padding:max(18px,env(safe-area-inset-top)) 0 16px;border-bottom:3px solid var(--signal)}
+header{background:var(--ink);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 18px) 0 16px;border-bottom:3px solid var(--signal)}
 .hd-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .hd-day{font-size:34px;line-height:1;text-transform:uppercase}
 .hd-meta{text-align:right;font-size:12px;color:#A8AEB8}
@@ -277,6 +277,7 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
     <div class="modebar" id="modeBar">
       <button type="button" data-m="gym" aria-pressed="true">헬스장</button>
       <button type="button" data-m="home" aria-pressed="false">홈트</button>
+      <button type="button" data-m="travel" aria-pressed="false">여행</button>
     </div>
     <div class="daybar" id="dayBar"></div>
     <div class="hd-prog"><i id="progBar"></i></div>
@@ -364,7 +365,7 @@ const CORE = [
    spec:"좌우 각각"}
 ];
 /* ═══ 홈트 — 기구·러닝머신 없이 (여행, 헬스장 못 갈 때) ═══ */
-const WALK = {id:"walk", n:"걷기", t:"30분", w:0, r:30, s:1, rest:0, unit:"분",
+const WALK = {id:"walk", n:"걷기", t:"30분", w:0, r:30, s:1, rest:0, unit:"분", noSets:true,
   bench:{type:"abs", v:[20,35,60], label:"걷는 시간(분)"},
   spec:"평지 위주로 30분 · 숙소 주변이나 관광 코스 걷기로 대체해도 됩니다 · 언덕이 많으면 시간을 줄이세요"};
 const HOME_LOWER = [
@@ -417,7 +418,38 @@ const HOME_CORE = [
    spec:"세트간 45초 · 허리를 바닥에 붙인 채 팔다리 반대로 뻗기 · 천천히"}
 ];
 
-const ALL_EX = [...LOWER,...UPPER,...CORE,...HOME_LOWER,...HOME_UPPER,...HOME_CORE,WALK]
+/* ═══ 여행 — 아령도 없이 맨몸만 ═══ */
+const TRAVEL_UPPER = [
+  {id:"pushup", n:"푸시업", t:"18개 × 4세트", w:0, r:18, s:4, rest:90, unit:"개",
+   warm:{w:0,r:8,note:"무릎을 바닥에 대고 8개 — 어깨·팔꿈치 예열"},
+   bench:{type:"abs", v:[12,22,35], label:"1세트 개수"},
+   spec:"세트간 90초 · 내릴 때 2초 · 팔꿈치 완전히 잠그지 않기"},
+  {id:"pike", n:"파이크 푸시업", t:"10개 × 3세트", w:0, r:10, s:3, rest:90, unit:"개",
+   warm:{w:0,r:5,note:"얕게 5개 — 어깨 예열"},
+   bench:{type:"abs", v:[5,12,20], label:"1세트 개수"},
+   spec:"세트간 90초 · 어깨 운동(아령 숄더프레스 대체) · 목이 바닥에 닿지 않게 얕게"},
+  {id:"diamond", n:"다이아몬드 푸시업", t:"12개 × 3세트", w:0, r:12, s:3, rest:90, unit:"개",
+   bench:{type:"abs", v:[6,14,25], label:"1세트 개수"},
+   spec:"세트간 90초 · 손을 모아 다이아몬드 모양 · 삼두 자극 위주"},
+  {id:"chairdip", n:"의자 딥스", t:"12개 × 3세트", w:0, r:12, s:3, rest:75, unit:"개",
+   warm:{w:0,r:6,note:"얕게 6개 — 어깨 예열"},
+   bench:{type:"abs", v:[8,16,28], label:"1세트 개수"},
+   spec:"세트간 75초 · 삼두 운동(트라이셉스 익스텐션 대체) · 너무 깊게 내려가면 어깨 부담"},
+  {id:"superman", n:"슈퍼맨", t:"15회 × 3세트", w:0, r:15, s:3, rest:60, unit:"회",
+   bench:{type:"abs", v:[10,20,30], label:"1세트 개수"},
+   spec:"세트간 60초 · 등 운동(리어델토이드 대체) · 반동 없이 2초 멈추기"}
+];
+const ROUTINES_TRAVEL = {
+  1:{focus:"하체 (여행)", run:null, ex:[WALK,...HOME_LOWER], stretch:"햄스트링 · 종아리 · 대퇴사두 각 30초 × 2회"},
+  2:{focus:"상체 (여행)", run:null, ex:[WALK,...TRAVEL_UPPER], stretch:"가슴 · 어깨 · 삼두 각 30초 × 2회"},
+  3:{focus:"걷기 + 코어 (여행)", run:null, ex:[WALK,...HOME_CORE], stretch:"전신 10분"},
+  4:{focus:"하체 (여행)", run:null, ex:[WALK,...HOME_LOWER], stretch:"햄스트링 · 종아리 · 대퇴사두 각 30초 × 2회"},
+  5:{focus:"상체 (여행)", run:null, ex:[WALK,...TRAVEL_UPPER], stretch:"가슴 · 어깨 · 삼두 각 30초 × 2회"},
+  6:{focus:"회복 (여행)", run:null, ex:[WALK], stretch:"스트레칭 / 요가 20분"},
+  0:{focus:"휴식", run:null, ex:[], stretch:"완전 휴식"}
+};
+
+const ALL_EX = [...LOWER,...UPPER,...CORE,...HOME_LOWER,...HOME_UPPER,...HOME_CORE,...TRAVEL_UPPER,WALK]
   .filter((e,i,a)=> a.findIndex(x=>x.id===e.id) === i);
 
 const ROUTINES = {
@@ -438,7 +470,7 @@ const ROUTINES_HOME = {
   6:{focus:"회복 (홈트)", run:null, ex:[WALK], stretch:"스트레칭 / 요가 20분"},
   0:{focus:"휴식", run:null, ex:[], stretch:"완전 휴식"}
 };
-const PLANS = { gym: ROUTINES, home: ROUTINES_HOME };
+const PLANS = { gym: ROUTINES, home: ROUTINES_HOME, travel: ROUTINES_TRAVEL };
 const DAY_KO = ["일","월","화","수","목","금","토"];
 const DAY_EN = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
@@ -530,6 +562,15 @@ const HOWTO = [
   {id:"lateral", n:"사이드 레터럴 레이즈", fig:"f_lat",
    steps:["아령을 양손에 들고 팔을 몸 옆에 내린다.","팔꿈치를 살짝 굽힌 채 양팔을 옆으로 들어올린다.","어깨 높이까지만 올리고 멈춘다.","3초에 걸쳐 천천히 내린다."],
    tip:"어깨보다 높이 올리면 어깨관절에 부담이 갑니다. 반동 없이 천천히."},
+  {id:"pike", n:"파이크 푸시업", fig:"f_pike",
+   steps:["푸시업 자세에서 발을 손 쪽으로 걸어와 엉덩이를 높이 든다(역V자).","머리가 바닥을 향하게 한다.","팔꿈치를 굽혀 정수리가 바닥 가까이 갈 때까지 내린다.","밀어 올려 원위치."],
+   tip:"아령 숄더프레스를 대신하는 어깨 운동입니다. 목이 바닥에 닿을 만큼 깊게 내려가지 마세요."},
+  {id:"chairdip", n:"의자 딥스", fig:"f_dip",
+   steps:["의자 앞에 등을 지고 서서 양손으로 의자 앞쪽 모서리를 잡는다.","발을 앞으로 뻗고 엉덩이를 의자에서 뗀다.","팔꿈치를 굽혀 엉덩이를 아래로 내린다.","팔로 밀어 올려 원위치."],
+   tip:"팔꿈치가 90도 정도까지만. 그보다 깊게 내려가면 어깨 앞쪽에 부담이 큽니다. 의자가 미끄러지지 않는지 먼저 확인하세요."},
+  {id:"superman", n:"슈퍼맨", fig:"f_super",
+   steps:["바닥에 엎드려 양팔을 앞으로 뻗는다.","팔과 다리를 동시에 바닥에서 들어올린다.","맨 위에서 2초 멈춘다.","천천히 내린다."],
+   tip:"리어델토이드를 대신하는 등 운동입니다. 목을 뒤로 젖히지 말고 시선은 바닥을 보세요."},
   {id:"deadbug", n:"데드버그", fig:"f_dead",
    steps:["바닥에 누워 양팔을 천장으로 뻗고 무릎은 90도로 든다.","허리를 바닥에 붙인 상태를 유지한다.","오른팔과 왼다리를 동시에 천천히 뻗는다.","돌아온 뒤 반대쪽을 반복."],
    tip:"허리가 바닥에서 뜨면 팔다리를 덜 뻗으세요. 속도보다 허리 붙이기가 중요합니다."},
@@ -549,6 +590,9 @@ const FIGS = {
   pushup:'<circle cx="46" cy="52" r="8"/><path d="M54 54 L150 74"/><path d="M150 74 L166 88"/><path d="M56 58 L56 88"/><path d="M120 68 L120 88"/><path d="M30 88 L176 88" stroke-dasharray="3 4"/><text x="90" y="42" class="lb">몸은 일자</text>',
   curl:'<circle cx="70" cy="30" r="9"/><path d="M70 39 L70 92"/><path d="M70 52 L70 74 L92 74"/><path d="M70 52 L70 66 L92 52" class="mv"/><rect x="92" y="48" width="16" height="8" rx="2" class="mv"/><rect x="92" y="70" width="16" height="8" rx="2"/><text x="120" y="60" class="lb">팔꿈치 고정</text>',
   triceps:'<circle cx="100" cy="44" r="9"/><path d="M100 53 L100 96"/><path d="M100 58 L88 34 L100 22"/><path d="M100 58 L112 34 L100 22"/><path d="M100 22 L124 32" class="mv"/><rect x="92" y="14" width="18" height="8" rx="2"/><text x="132" y="46" class="lb">뒤로 내리기</text>',
+  f_pike:'<path d="M20 100 L180 100" stroke-dasharray="3 4"/><circle cx="56" cy="76" r="8"/><path d="M62 70 L100 34 L146 96"/><path d="M62 70 L56 96" class="mv"/><path d="M50 96 L70 96"/><text x="106" y="52" class="lb">엉덩이를 높게</text>',
+  f_dip:'<path d="M30 40 L30 100 M30 40 L86 40" /><circle cx="106" cy="42" r="8"/><path d="M106 50 L106 78 L152 78"/><path d="M152 78 L152 100"/><path d="M106 54 L82 54 L82 40" class="mv"/><path d="M140 100 L166 100"/><text x="112" y="30" class="lb">의자 잡고 내려가기</text>',
+  f_super:'<path d="M20 92 L180 92" stroke-dasharray="3 4"/><circle cx="58" cy="62" r="8"/><path d="M66 66 L142 76"/><path d="M64 60 L34 44" class="mv"/><path d="M142 76 L172 60" class="mv"/><text x="96" y="40" class="lb">팔·다리 동시에 들기</text>',
   f_hip:'<path d="M20 100 L180 100" stroke-dasharray="3 4"/><circle cx="44" cy="80" r="8"/><path d="M52 82 L96 66" class="mv"/><path d="M96 66 L118 92 L118 100"/><path d="M96 66 L134 76" stroke-dasharray="3 3"/><text x="86" y="44" class="lb">엉덩이 들어올리기</text>',
   f_wall:'<path d="M46 14 L46 110"/><path d="M46 40 L46 74" stroke-width="5" class="mv"/><circle cx="66" cy="34" r="8"/><path d="M54 44 L54 74 L104 74"/><path d="M104 74 L104 106"/><path d="M92 106 L116 106"/><text x="112" y="52" class="lb">무릎 90도</text>',
   f_diamond:'<circle cx="46" cy="52" r="8"/><path d="M54 54 L150 74"/><path d="M150 74 L166 88"/><path d="M96 62 L88 88 L104 88 Z" class="mv"/><path d="M30 88 L176 88" stroke-dasharray="3 4"/><text x="96" y="40" class="lb">손 모아 다이아몬드</text>',
@@ -673,7 +717,9 @@ function renderModeBar(){
       clearInterval(runT); runT = null; keepAwake(false);
       renderModeBar(); syncHeader(); renderToday(); refreshBodyUI();
       loadLogs(60).then(applySuggestions).catch(()=>{});
-      toast(mode === "home" ? "홈트 루틴으로 바꿨습니다 — 기구·러닝머신 없이" : "헬스장 루틴으로 돌아왔습니다");
+      toast(mode === "home" ? "홈트 — 아령(1·3kg)만 사용합니다"
+          : mode === "travel" ? "여행 — 아무 도구도 없이 맨몸으로만 합니다"
+          : "헬스장 루틴으로 돌아왔습니다");
     };
   });
 }
@@ -749,6 +795,7 @@ function initBodyChip(){
 }
 
 function totalSets(){ return routine.ex.reduce((a,e)=> a + (getVal(e.id,"s")||e.s) + (e.warm?1:0), 0) + (routine.run?1:0); }
+/* getVal 은 칸이 없으면 null → 위에서 e.s 로 대체됩니다 */
 function doneTotal(){ return Object.values(doneSets).reduce((a,b)=>a+b,0) + (runDone?1:0); }
 function updateProgress(){
   const t = totalSets(), d = doneTotal();
@@ -883,14 +930,14 @@ function renderToday(){
   if (routine.ex.length){
     h += '<div class="eyebrow">'+routine.focus+' · '+routine.ex.length+'종목</div>';
     routine.ex.forEach(ex=>{
-      const unit = ex.unit==="초" ? "초" : (ex.unit==="개" ? "개" : "회");
+      const unit = ex.unit === "kg" ? "회" : ex.unit;   // 분·초·개는 그대로
       h += '<div class="card" data-ex="'+ex.id+'">'
         + '<div class="card-hd"><h3><span data-check></span>'+ex.n+'</h3><span class="ex-target">'+ex.t+'</span></div>'
         + '<div class="card-bd">'
-        +   '<div class="fields"'+(ex.w?'':' style="grid-template-columns:1fr 1fr"')+'>'
+        +   '<div class="fields" style="grid-template-columns:repeat('+((ex.w?1:0)+(ex.noSets?0:1)+1)+',1fr)">'
         +     (ex.w ? stepper("w", ex.w, 0, 300, "무게 kg") : '')
         +     stepper("r", ex.r, 1, 300, unit)
-        +     stepper("s", ex.s, 1, 10, "세트")
+        +     (ex.noSets ? '' : stepper("s", ex.s, 1, 10, "세트"))
         +   '</div><p class="drag-hint">숫자를 위아래로 밀면 빠르게, − + 는 1단위</p>'
         +   '<div data-sugg></div>'
         +   benchBlock(ex)
@@ -940,7 +987,8 @@ function renderSetZone(ex){
   const sets = getVal(ex.id,"s") || ex.s;
   const done = doneSets[ex.id] || 0;
   if (!started[ex.id]){
-    zone.innerHTML = '<button class="startbtn" data-start>'+ex.n+(ex.warm?' — 워밍업부터 시작':' 시작')+'</button>'
+    zone.innerHTML = '<button class="startbtn" data-start>'
+      + (ex.id === "walk" ? '걷기 완료 표시' : ex.n + (ex.warm ? ' — 워밍업부터 시작' : ' 시작')) + '</button>'
       + (ex.warm ? '<p class="drag-hint" style="margin:-6px 0 12px">워밍업: '
           + (ex.warm.note ? ex.warm.note : ex.warm.w+'kg × '+ex.warm.r+'회')
           + ' → 본 세트</p>' : '');
@@ -1073,6 +1121,10 @@ function applySuggestions(logs){
 function settingsBlock(){
   return '<div class="eyebrow">설정</div><div class="card"><div class="card-bd">'
    + '<p class="spec">체중은 화면 오른쪽 위 <b>체중 '+bodyKg+'kg ✎</b>를 눌러 바꿉니다. 참고치(입문 · 평균 · 숙련)는 이 체중을 기준으로 계산합니다. 30대 남성 일반 헬스 이용자의 대략적인 범위이고 기계 종류에 따라 실제 값은 달라지니 방향만 참고하세요. 최종 기준은 참고치가 아니라 관절 반응입니다.</p>'
+   + '<h3 style="font-size:13px;margin:14px 0 5px">루틴 3가지</h3>'
+   + '<p class="spec"><b>헬스장</b> — 기구 + 러닝머신 전부 사용<br>'
+   + '<b>홈트</b> — 기구·러닝머신 없이, 아령(1·3kg)과 맨몸<br>'
+   + '<b>여행</b> — 아령도 없이 맨몸만. 아령 컬·트라이셉스·레터럴 자리에 파이크 푸시업(어깨), 의자 딥스(삼두), 슈퍼맨(등)이 들어갑니다. 이두(알통)는 도구 없이 대체가 마땅치 않아 빠져 있으니, 배낭이나 물병이 있으면 그걸로 아령 컬을 해도 됩니다.</p>'
    + '<h3 style="font-size:13px;margin:14px 0 5px">하지 않는 동작</h3>'
    + '<p class="spec">런지 · 버피 · 점프 스쿼트 · 박스 점프처럼 착지 충격이 있는 동작, 12 km/h 이상 스프린트, 경사 5% 이상 러닝은 루틴에서 제외합니다.</p>'
    + '</div></div>';
