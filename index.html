@@ -239,6 +239,9 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
 .step.dragging{border-color:var(--signal);box-shadow:0 0 0 1px var(--signal)}
 .step.dragging input{color:var(--signal)}
 .drag-hint{font-size:9.5px;color:var(--ink-3);text-align:center;margin-top:3px}
+.modebar{display:flex;gap:4px;margin-top:12px;padding:3px;background:#22262E;border-radius:3px}
+.modebar button{flex:1;border:0;background:transparent;color:#8A919C;border-radius:2px;padding:8px 0;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.modebar button[aria-pressed="true"]{background:#fff;color:var(--ink)}
 .daybar{display:flex;gap:4px;margin-top:12px}
 .daybar button{flex:1;border:1px solid #363B44;background:transparent;color:#A8AEB8;border-radius:2px;padding:6px 0;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
 .daybar button[aria-pressed="true"]{background:#fff;border-color:#fff;color:var(--ink)}
@@ -270,6 +273,10 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
           체중 <b id="hdBodyVal">—</b>kg <span class="pen">✎</span>
         </button>
       </div>
+    </div>
+    <div class="modebar" id="modeBar">
+      <button type="button" data-m="gym" aria-pressed="true">헬스장</button>
+      <button type="button" data-m="home" aria-pressed="false">홈트</button>
     </div>
     <div class="daybar" id="dayBar"></div>
     <div class="hd-prog"><i id="progBar"></i></div>
@@ -356,7 +363,62 @@ const CORE = [
    bench:{type:"abs", v:[20,40,70], label:"한쪽 시간(초)"},
    spec:"좌우 각각"}
 ];
-const ALL_EX = [...LOWER,...UPPER,...CORE];
+/* ═══ 홈트 — 기구·러닝머신 없이 (여행, 헬스장 못 갈 때) ═══ */
+const WALK = {id:"walk", n:"걷기", t:"30분", w:0, r:30, s:1, rest:0, unit:"분",
+  bench:{type:"abs", v:[20,35,60], label:"걷는 시간(분)"},
+  spec:"평지 위주로 30분 · 숙소 주변이나 관광 코스 걷기로 대체해도 됩니다 · 언덕이 많으면 시간을 줄이세요"};
+const HOME_LOWER = [
+  {id:"squat_home", n:"맨몸 스쿼트", t:"25회 × 4세트", w:0, r:25, s:4, rest:75, unit:"회",
+   warm:{w:0,r:10,note:"천천히 10회 — 무릎 예열"},
+   bench:{type:"abs", v:[20,35,55], label:"1세트 개수"},
+   spec:"세트간 75초 · 내릴 때 2초 / 올릴 때 1초 · 무릎이 안쪽으로 모이지 않게"},
+  {id:"hipbridge", n:"힙브릿지", t:"20회 × 3세트", w:0, r:20, s:3, rest:60, unit:"회",
+   warm:{w:0,r:10,note:"가볍게 10회"},
+   bench:{type:"abs", v:[15,30,50], label:"1세트 개수"},
+   spec:"세트간 60초 · 맨 위에서 엉덩이에 힘주고 1초 멈추기"},
+  {id:"calf_home", n:"카프레이즈 (맨몸)", t:"25회 × 3세트", w:0, r:25, s:3, rest:45, unit:"회",
+   bench:{type:"abs", v:[20,40,60], label:"1세트 개수"},
+   spec:"세트간 45초 · 계단 끝이나 문턱에 발볼만 걸치면 가동범위가 커집니다"},
+  {id:"wallsit", n:"월싯", t:"45초 × 3세트", w:0, r:45, s:3, rest:60, unit:"초",
+   bench:{type:"abs", v:[30,60,100], label:"버틴 시간(초)"},
+   spec:"세트간 60초 · 무릎 90도 · 벽에 등 붙이고 버티기"}
+];
+const HOME_UPPER = [
+  {id:"pushup", n:"푸시업", t:"18개 × 4세트", w:0, r:18, s:4, rest:90, unit:"개",
+   warm:{w:0,r:8,note:"무릎을 바닥에 대고 8개 — 어깨·팔꿈치 예열"},
+   bench:{type:"abs", v:[12,22,35], label:"1세트 개수"},
+   spec:"세트간 90초 · 내릴 때 2초 · 팔꿈치 완전히 잠그지 않기"},
+  {id:"diamond", n:"다이아몬드 푸시업", t:"12개 × 3세트", w:0, r:12, s:3, rest:90, unit:"개",
+   bench:{type:"abs", v:[6,14,25], label:"1세트 개수"},
+   spec:"세트간 90초 · 손을 모아 다이아몬드 모양 · 삼두 자극 위주"},
+  {id:"lateral", n:"사이드 레터럴 레이즈", t:"3kg × 15회 × 3세트", w:3, r:15, s:3, rest:60, unit:"kg",
+   warm:{w:1,r:15,note:"가벼운 무게로 15회 — 어깨 예열"},
+   bench:{type:"abs", v:[3,7,12], label:"한 팔 무게"},
+   spec:"세트간 60초 · 팔을 옆으로 어깨 높이까지만 · 내릴 때 3초 · 어깨 위로 올리지 않기"},
+  {id:"curl", n:"아령 컬", t:"3kg × 20회 × 3세트", w:3, r:20, s:3, rest:60, unit:"kg",
+   warm:{w:1,r:15,note:"가벼운 무게로 15회 — 팔꿈치 예열"},
+   bench:{type:"abs", v:[5,9,14], label:"한 팔 무게"},
+   spec:"세트간 60초 · 팔꿈치 몸통에 고정 · 내릴 때 3초"},
+  {id:"triceps", n:"트라이셉스 익스텐션", t:"3kg × 15회 × 3세트", w:3, r:15, s:3, rest:60, unit:"kg",
+   warm:{w:1,r:15,note:"가벼운 무게로 15회 — 팔꿈치 예열"},
+   bench:{type:"abs", v:[5,9,14], label:"양손 무게"},
+   spec:"세트간 60초 · 팔꿈치 위치 고정 · 머리 뒤로 천천히"}
+];
+const HOME_CORE = [
+  {id:"plank", n:"플랭크", t:"60초 × 3세트", w:0, r:60, s:3, rest:60, unit:"초",
+   warm:{w:0,r:20,note:"20초만 먼저 버텨 자세 잡기"},
+   bench:{type:"abs", v:[40,75,120], label:"버틴 시간(초)"},
+   spec:"세트간 60초 · 엉덩이 처지지 않게"},
+  {id:"sideplank", n:"사이드 플랭크", t:"좌우 30초 × 2세트", w:0, r:30, s:2, rest:45, unit:"초",
+   bench:{type:"abs", v:[20,40,70], label:"한쪽 시간(초)"},
+   spec:"좌우 각각"},
+  {id:"deadbug", n:"데드버그", t:"좌우 12회 × 3세트", w:0, r:12, s:3, rest:45, unit:"회",
+   bench:{type:"abs", v:[8,15,25], label:"한쪽 개수"},
+   spec:"세트간 45초 · 허리를 바닥에 붙인 채 팔다리 반대로 뻗기 · 천천히"}
+];
+
+const ALL_EX = [...LOWER,...UPPER,...CORE,...HOME_LOWER,...HOME_UPPER,...HOME_CORE,WALK]
+  .filter((e,i,a)=> a.findIndex(x=>x.id===e.id) === i);
 
 const ROUTINES = {
   1:{focus:"하체", run:"lower", ex:LOWER, stretch:"햄스트링 · 종아리 · 대퇴사두 각 30초 × 2회"},
@@ -367,6 +429,16 @@ const ROUTINES = {
   6:{focus:"회복", run:"easy", ex:[], stretch:"스트레칭 / 요가 20분"},
   0:{focus:"휴식", run:null, ex:[], stretch:"완전 휴식 — 러닝도 쉬는 날"}
 };
+const ROUTINES_HOME = {
+  1:{focus:"하체 (홈트)", run:null, ex:[WALK,...HOME_LOWER], stretch:"햄스트링 · 종아리 · 대퇴사두 각 30초 × 2회"},
+  2:{focus:"상체 (홈트)", run:null, ex:[WALK,...HOME_UPPER], stretch:"가슴 · 어깨 · 삼두 각 30초 × 2회"},
+  3:{focus:"걷기 + 코어 (홈트)", run:null, ex:[WALK,...HOME_CORE], stretch:"전신 10분"},
+  4:{focus:"하체 (홈트)", run:null, ex:[WALK,...HOME_LOWER], stretch:"햄스트링 · 종아리 · 대퇴사두 각 30초 × 2회"},
+  5:{focus:"상체 (홈트)", run:null, ex:[WALK,...HOME_UPPER], stretch:"가슴 · 어깨 · 삼두 각 30초 × 2회"},
+  6:{focus:"회복 (홈트)", run:null, ex:[WALK], stretch:"스트레칭 / 요가 20분"},
+  0:{focus:"휴식", run:null, ex:[], stretch:"완전 휴식"}
+};
+const PLANS = { gym: ROUTINES, home: ROUTINES_HOME };
 const DAY_KO = ["일","월","화","수","목","금","토"];
 const DAY_EN = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
@@ -437,6 +509,33 @@ const HOWTO = [
   {id:"triceps", n:"트라이셉스 익스텐션", fig:"triceps",
    steps:["아령을 양손으로 잡고 머리 위로 팔을 뻗는다.","팔꿈치 위치를 고정한다.","팔꿈치만 굽혀 머리 뒤로 천천히 내린다.","다시 위로 밀어 올린다."],
    tip:"팔꿈치가 바깥으로 벌어지지 않게 붙여두세요."},
+  {id:"walk", n:"걷기", fig:"f_walk",
+   steps:["평지 위주 코스로 정한다.","처음 3분은 천천히 시작해 몸을 데운다.","대화가 가능한 정도의 속도로 유지한다.","마지막 3분은 속도를 낮춰 마무리한다."],
+   tip:"여행 중이면 관광하며 걷는 것으로 대체해도 됩니다. 계단이나 언덕이 많은 코스는 무릎 부담이 크니 시간을 줄이세요."},
+  {id:"squat_home", n:"맨몸 스쿼트", fig:"squat",
+   steps:["발을 어깨너비로 벌리고 발끝은 살짝 바깥쪽.","가슴을 편 채 엉덩이를 뒤로 빼며 앉는다.","허벅지가 바닥과 수평이 될 때까지 2초에 내린다.","발뒤꿈치로 바닥을 밀며 일어선다."],
+   tip:"무게가 없으니 속도를 늦춰 자극을 만드세요. 점프 스쿼트나 런지로 바꾸지 않습니다."},
+  {id:"hipbridge", n:"힙브릿지", fig:"f_hip",
+   steps:["바닥에 누워 무릎을 세우고 발은 엉덩이 가까이 둔다.","발바닥으로 바닥을 밀며 엉덩이를 들어올린다.","무릎–엉덩이–어깨가 일직선이 되면 1초 멈춘다.","천천히 내려 바닥에 살짝 닿았다가 반복."],
+   tip:"허리로 들어올리지 말고 엉덩이에 힘이 들어가는지 확인하세요."},
+  {id:"calf_home", n:"카프레이즈 (맨몸)", fig:"calf",
+   steps:["벽이나 의자를 손으로 짚고 선다.","발뒤꿈치를 최대한 위로 들어올린다.","맨 위에서 1초 멈춘다.","천천히 내린다."],
+   tip:"계단 끝이나 문턱에 발볼만 걸치면 가동범위가 커져 효과가 좋습니다."},
+  {id:"wallsit", n:"월싯", fig:"f_wall",
+   steps:["벽에 등을 대고 선다.","발을 앞으로 한 걸음 내밀고 무릎이 90도가 될 때까지 미끄러지듯 내려간다.","허벅지가 바닥과 수평이 되는 자세로 버틴다.","호흡은 멈추지 않는다."],
+   tip:"무릎이 발끝보다 앞으로 나가면 발을 더 앞으로 옮기세요."},
+  {id:"diamond", n:"다이아몬드 푸시업", fig:"f_diamond",
+   steps:["손을 모아 엄지와 검지로 다이아몬드 모양을 만든다.","몸은 머리부터 발끝까지 일자 유지.","가슴이 손 근처에 올 때까지 내린다.","밀어 올려 원위치."],
+   tip:"일반 푸시업보다 팔꿈치 부담이 큽니다. 개수를 줄이더라도 자세를 지키세요."},
+  {id:"lateral", n:"사이드 레터럴 레이즈", fig:"f_lat",
+   steps:["아령을 양손에 들고 팔을 몸 옆에 내린다.","팔꿈치를 살짝 굽힌 채 양팔을 옆으로 들어올린다.","어깨 높이까지만 올리고 멈춘다.","3초에 걸쳐 천천히 내린다."],
+   tip:"어깨보다 높이 올리면 어깨관절에 부담이 갑니다. 반동 없이 천천히."},
+  {id:"deadbug", n:"데드버그", fig:"f_dead",
+   steps:["바닥에 누워 양팔을 천장으로 뻗고 무릎은 90도로 든다.","허리를 바닥에 붙인 상태를 유지한다.","오른팔과 왼다리를 동시에 천천히 뻗는다.","돌아온 뒤 반대쪽을 반복."],
+   tip:"허리가 바닥에서 뜨면 팔다리를 덜 뻗으세요. 속도보다 허리 붙이기가 중요합니다."},
+  {id:"sideplank", n:"사이드 플랭크", fig:"plank",
+   steps:["옆으로 누워 팔꿈치로 바닥을 지지한다.","엉덩이를 들어 머리–엉덩이–발이 일직선이 되게 한다.","30초 버틴 뒤 반대쪽도 같게.","호흡은 자연스럽게."],
+   tip:"어깨 바로 아래에 팔꿈치가 오도록 두세요."},
   {id:"plank", n:"플랭크", fig:"plank",
    steps:["팔꿈치와 발끝으로 바닥을 지지한다.","머리부터 발끝까지 일자를 만든다.","배에 힘을 주고 엉덩이가 처지거나 솟지 않게 유지한다.","호흡은 멈추지 않고 자연스럽게."],
    tip:"허리가 아프면 즉시 중단하세요. 시간을 늘리기보다 자세를 정확히 유지하는 쪽이 낫습니다."}
@@ -450,6 +549,12 @@ const FIGS = {
   pushup:'<circle cx="46" cy="52" r="8"/><path d="M54 54 L150 74"/><path d="M150 74 L166 88"/><path d="M56 58 L56 88"/><path d="M120 68 L120 88"/><path d="M30 88 L176 88" stroke-dasharray="3 4"/><text x="90" y="42" class="lb">몸은 일자</text>',
   curl:'<circle cx="70" cy="30" r="9"/><path d="M70 39 L70 92"/><path d="M70 52 L70 74 L92 74"/><path d="M70 52 L70 66 L92 52" class="mv"/><rect x="92" y="48" width="16" height="8" rx="2" class="mv"/><rect x="92" y="70" width="16" height="8" rx="2"/><text x="120" y="60" class="lb">팔꿈치 고정</text>',
   triceps:'<circle cx="100" cy="44" r="9"/><path d="M100 53 L100 96"/><path d="M100 58 L88 34 L100 22"/><path d="M100 58 L112 34 L100 22"/><path d="M100 22 L124 32" class="mv"/><rect x="92" y="14" width="18" height="8" rx="2"/><text x="132" y="46" class="lb">뒤로 내리기</text>',
+  f_hip:'<path d="M20 100 L180 100" stroke-dasharray="3 4"/><circle cx="44" cy="80" r="8"/><path d="M52 82 L96 66" class="mv"/><path d="M96 66 L118 92 L118 100"/><path d="M96 66 L134 76" stroke-dasharray="3 3"/><text x="86" y="44" class="lb">엉덩이 들어올리기</text>',
+  f_wall:'<path d="M46 14 L46 110"/><path d="M46 40 L46 74" stroke-width="5" class="mv"/><circle cx="66" cy="34" r="8"/><path d="M54 44 L54 74 L104 74"/><path d="M104 74 L104 106"/><path d="M92 106 L116 106"/><text x="112" y="52" class="lb">무릎 90도</text>',
+  f_diamond:'<circle cx="46" cy="52" r="8"/><path d="M54 54 L150 74"/><path d="M150 74 L166 88"/><path d="M96 62 L88 88 L104 88 Z" class="mv"/><path d="M30 88 L176 88" stroke-dasharray="3 4"/><text x="96" y="40" class="lb">손 모아 다이아몬드</text>',
+  f_lat:'<circle cx="100" cy="30" r="9"/><path d="M100 39 L100 96"/><path d="M100 50 L58 50" class="mv"/><path d="M100 50 L142 50" class="mv"/><rect x="44" y="46" width="14" height="8" rx="2"/><rect x="142" y="46" width="14" height="8" rx="2"/><text x="100" y="108" class="lb" text-anchor="middle">어깨 높이까지만</text>',
+  f_dead:'<path d="M20 96 L180 96" stroke-dasharray="3 4"/><circle cx="50" cy="80" r="8"/><path d="M58 82 L120 86"/><path d="M64 80 L52 52" class="mv"/><path d="M120 86 L118 56"/><path d="M120 86 L162 88" class="mv"/><text x="96" y="40" class="lb">팔·다리 반대로</text>',
+  f_walk:'<circle cx="70" cy="26" r="8"/><path d="M70 34 L70 66"/><path d="M70 42 L52 58"/><path d="M70 42 L90 56"/><path d="M70 66 L54 96"/><path d="M70 66 L90 96"/><circle cx="140" cy="26" r="8"/><path d="M140 34 L140 66"/><path d="M140 42 L156 56" class="mv"/><path d="M140 66 L126 96" class="mv"/><path d="M140 66 L158 92" class="mv"/><path d="M20 100 L180 100" stroke-dasharray="3 4"/>',
   s_ham:'<circle cx="52" cy="46" r="8"/><path d="M52 54 L58 78 L150 84"/><path d="M58 78 L100 96 L84 62" /><path d="M58 70 L120 84" class="mv"/><text x="120" y="60" class="lb">허리 편 채 숙이기</text>',
   s_calf:'<path d="M170 20 L170 100" stroke-dasharray="4 4"/><circle cx="118" cy="34" r="8"/><path d="M118 42 L112 72"/><path d="M118 46 L156 40"/><path d="M112 72 L146 92"/><path d="M112 72 L66 96" class="mv"/><path d="M60 96 L76 96" class="mv"/><text x="40" y="66" class="lb">뒤꿈치 붙이기</text>',
   s_quad:'<circle cx="90" cy="28" r="8"/><path d="M90 36 L90 74"/><path d="M90 74 L86 104"/><path d="M90 74 L104 92 L86 92" class="mv"/><path d="M90 48 L104 88" class="mv"/><text x="118" y="60" class="lb">무릎 붙이고 당기기</text>',
@@ -501,8 +606,9 @@ const todayKey = toKey(today);
 let dateKey = todayKey;                      // 기록을 저장할 날짜 (바꿀 수 있음)
 const realDow = today.getDay();
 let dow = realDow;
-let routine = ROUTINES[dow];
-let entry = { user:USER_ID, date:dateKey, dow, focus:routine.focus, exercises:{}, joints:{} };
+let mode = "gym";
+let routine = PLANS[mode][dow];
+let entry = { user:USER_ID, date:dateKey, dow, mode:"gym", focus:routine.focus, exercises:{}, joints:{} };
 let runDone = false;
 let started = {};   // exId -> true
 let doneSets = {};  // exId -> n
@@ -531,8 +637,8 @@ async function switchDate(key){
   dateKey = key;
   const d = new Date(key + "T00:00:00");
   dow = d.getDay();
-  routine = ROUTINES[dow];
-  entry = { user:USER_ID, date:dateKey, dow, focus:routine.focus, exercises:{}, joints:{} };
+  routine = PLANS[mode][dow];
+  entry = { user:USER_ID, date:dateKey, dow, mode, focus:routine.focus, exercises:{}, joints:{} };
   started = {}; doneSets = {}; runDone = false;
   Object.keys(timers).forEach(stopTimer);
   clearInterval(runT); runT = null; keepAwake(false);
@@ -553,6 +659,25 @@ function initDatePicker(){
   inp.onchange = ()=>{ if (inp.value) switchDate(inp.value); };
 }
 
+function renderModeBar(){
+  document.querySelectorAll("#modeBar button").forEach(b=>{
+    b.setAttribute("aria-pressed", b.dataset.m === mode);
+    b.onclick = ()=>{
+      if (b.dataset.m === mode) return;
+      if (doneTotal() > 0 && !confirm("진행 중인 세트 기록이 지워집니다. 바꿀까요?")) return;
+      mode = b.dataset.m;
+      routine = PLANS[mode][dow];
+      entry.mode = mode; entry.focus = routine.focus; entry.exercises = {};
+      started = {}; doneSets = {}; runDone = false;
+      Object.keys(timers).forEach(stopTimer);
+      clearInterval(runT); runT = null; keepAwake(false);
+      renderModeBar(); syncHeader(); renderToday(); refreshBodyUI();
+      loadLogs(60).then(applySuggestions).catch(()=>{});
+      toast(mode === "home" ? "홈트 루틴으로 바꿨습니다 — 기구·러닝머신 없이" : "헬스장 루틴으로 돌아왔습니다");
+    };
+  });
+}
+
 function renderDayBar(){
   document.getElementById("dayBar").innerHTML = [1,2,3,4,5,6,0].map(d=>
     '<button type="button" data-d="'+d+'" aria-pressed="'+(d===dow)+'"'+(d===realDow?' class="today"':'')+'>'+DAY_KO[d]+'</button>').join("");
@@ -562,7 +687,7 @@ function renderDayBar(){
       if (d === dow) return;
       if (doneTotal() > 0 && !confirm("진행 중인 세트 기록이 지워집니다. 루틴을 바꿀까요?")) return;
       /* 루틴만 바꾸는 것 — 저장 날짜는 그대로 유지됩니다 */
-      dow = d; routine = ROUTINES[d];
+      dow = d; routine = PLANS[mode][d];
       entry.dow = d; entry.focus = routine.focus;
       entry.exercises = {}; started = {}; doneSets = {}; runDone = false;
       Object.keys(timers).forEach(stopTimer);
@@ -1177,10 +1302,12 @@ function autosave(){
 /* 저장해둔 오늘 기록 이어서 하기 */
 function restore(prev){
   if (!prev) return false;
-  if (prev.dow !== undefined && prev.dow !== dow){
-    dow = prev.dow; routine = ROUTINES[dow];
-    entry.dow = dow; entry.focus = routine.focus;
-    renderDayBar(); syncHeader(); renderToday();
+  if ((prev.mode && prev.mode !== mode) || (prev.dow !== undefined && prev.dow !== dow)){
+    if (prev.mode) mode = prev.mode;
+    if (prev.dow !== undefined) dow = prev.dow;
+    routine = PLANS[mode][dow];
+    entry.dow = dow; entry.mode = mode; entry.focus = routine.focus;
+    renderModeBar(); renderDayBar(); syncHeader(); renderToday(); refreshBodyUI();
   }
   Object.entries(prev.exercises||{}).forEach(([id,o])=>{
     const card = document.querySelector('[data-ex="'+id+'"]');
@@ -1343,7 +1470,7 @@ async function boot(){
     }
   } catch(e){}
   initDatePicker();
-  renderDayBar(); syncHeader(); initBodyChip(); renderToday(); refreshBodyUI();
+  renderModeBar(); renderDayBar(); syncHeader(); initBodyChip(); renderToday(); refreshBodyUI();
   try {
     const logs = await loadLogs(60);
     applySuggestions(logs);
