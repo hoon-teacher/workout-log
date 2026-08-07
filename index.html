@@ -239,6 +239,7 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
 .step.dragging{border-color:var(--signal);box-shadow:0 0 0 1px var(--signal)}
 .step.dragging input{color:var(--signal)}
 .drag-hint{font-size:9.5px;color:var(--ink-3);text-align:center;margin-top:3px}
+.dow-note{margin:8px 0 0;font-size:11px;color:#E0A422;line-height:1.4}
 .modebar{display:flex;gap:4px;margin-top:12px;padding:3px;background:#22262E;border-radius:3px}
 .modebar button{flex:1;border:0;background:transparent;color:#8A919C;border-radius:2px;padding:8px 0;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .modebar button[aria-pressed="true"]{background:#fff;color:var(--ink)}
@@ -280,6 +281,7 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
       <button type="button" data-m="travel" aria-pressed="false">여행</button>
     </div>
     <div class="daybar" id="dayBar"></div>
+    <p id="dowNote" class="dow-note" hidden>다른 요일 루틴을 보는 중입니다. 저장은 위의 날짜로 들어갑니다.</p>
     <div class="hd-prog"><i id="progBar"></i></div>
     <div class="hd-prog-lbl"><span id="progTxt">시작 전</span><span class="mono" id="progNum">0 / 0</span></div>
   </div>
@@ -621,7 +623,24 @@ if (firebaseConfig.apiKey) {
   showBanner("Firebase 설정값을 넣기 전입니다. 지금 기록은 새로고침하면 사라집니다.");
 }
 function showBanner(m){ const b=document.getElementById("banner"); b.textContent=m; b.hidden=false; }
-async function saveLog(d,data){ if(db) await db.collection(COLLECTION).doc(USER_ID+"_"+d).set(data); else memory[d]=data; }
+async function saveLog(d,data){
+  /* 같은 날짜에 이미 저장된 기록이 있으면 종목을 합칩니다 — 덮어써서 날아가지 않게 */
+  let prev = null;
+  try { prev = await loadOne(d); } catch(e){}
+  const merged = Object.assign({}, prev || {}, data);
+  merged.exercises = Object.assign({}, (prev && prev.exercises) || {}, data.exercises || {});
+  merged.joints    = Object.assign({}, (prev && prev.joints) || {}, data.joints || {});
+  if (prev && prev.run && !(data.run && data.run.km)) merged.run = prev.run;
+  if (prev && prev.focus && prev.focus !== data.focus){
+    const list = (prev.focusList || [prev.focus]);
+    if (!list.includes(data.focus)) list.push(data.focus);
+    merged.focusList = list;
+    merged.focus = list.join(" + ");
+  }
+  if(db) await db.collection(COLLECTION).doc(USER_ID+"_"+d).set(merged);
+  else memory[d] = merged;
+  return merged;
+}
 let lastLoadError = null;
 async function loadLogs(n){
   if(db){
@@ -660,6 +679,9 @@ let timers = {};
 
 function syncHeader(){
   document.getElementById("hdDate").textContent = dateKey;
+  const trueDow = new Date(dateKey + "T00:00:00").getDay();
+  const noteEl = document.getElementById("dowNote");
+  if (noteEl) noteEl.hidden = (dow === trueDow);
   const past = dateKey !== todayKey;
   const bar = document.getElementById("pastbar");
   if (past){
