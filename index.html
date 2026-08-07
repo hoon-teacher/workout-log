@@ -42,6 +42,18 @@ header{background:var(--ink);color:#fff;padding:max(18px,env(safe-area-inset-top
 .hd-meta{text-align:right;font-size:12px;color:#A8AEB8}
 .hd-focus{display:inline-block;margin-top:10px;padding:3px 9px;border-radius:2px;background:var(--signal);color:#fff;font-size:12px;font-weight:700;letter-spacing:.04em}
 .hd-focus.rest{background:#565C66}
+.hd-datebtn{background:none;border:0;padding:0;color:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.hd-datebtn .pen{opacity:.6;font-size:10px}
+.hd-datebtn input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.pastbar{background:var(--caution);color:#fff;font-size:12px;font-weight:600;padding:8px 14px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px}
+.pastbar button{border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;border-radius:2px;padding:3px 9px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
+.hd-body{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:4px 9px;border:1px solid #3A404A;border-radius:2px;background:transparent;color:#A8AEB8;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.hd-body b{font-family:'JetBrains Mono',monospace;color:#fff;font-weight:700;font-size:12px}
+.hd-body:active{background:#22262E}
+.hd-body .pen{opacity:.7;font-size:10px}
+.hd-body.editing{border-color:var(--signal)}
+.hd-body input{width:44px;border:0;background:none;color:#fff;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;text-align:right;padding:0;touch-action:none}
+.hd-body input:focus{outline:none}
 .hd-prog{margin-top:12px;height:4px;background:#2C3038;border-radius:2px;overflow:hidden}
 .hd-prog i{display:block;height:100%;width:0;background:var(--signal);transition:width .35s ease}
 .hd-prog-lbl{margin-top:5px;font-size:11px;color:#A8AEB8;display:flex;justify-content:space-between}
@@ -239,6 +251,7 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
 <body>
 
 <div id="banner" class="banner" hidden></div>
+<div id="pastbar" class="pastbar" hidden></div>
 
 <header>
   <div class="wrap">
@@ -248,8 +261,14 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
         <div class="hd-focus" id="hdFocus">—</div>
       </div>
       <div class="hd-meta">
-        <div class="mono" id="hdDate">—</div>
+        <button type="button" class="hd-datebtn" id="hdDateBtn">
+          <span id="hdDate">—</span><span class="pen">📅</span>
+          <input type="date" id="datePick">
+        </button>
         <div id="hdWeek">—</div>
+        <button type="button" class="hd-body" id="hdBody" aria-label="체중 수정">
+          체중 <b id="hdBodyVal">—</b>kg <span class="pen">✎</span>
+        </button>
       </div>
     </div>
     <div class="daybar" id="dayBar"></div>
@@ -304,7 +323,7 @@ const RUN = {
 const LOWER = [
   {id:"legpress", n:"레그프레스", t:"73kg × 15회 × 3세트", w:73, r:15, s:3, rest:90, unit:"kg", warm:{w:45,r:12},
    bench:{type:"bw", v:[0.6,0.95,1.35]},
-   spec:"워밍업 45kg × 12회 먼저 · 세트간 90초 · 내릴 때 3초 / 밀 때 1초 · 무릎 90도까지만, 끝에서 잠그지 않기"},
+   spec:"세트간 90초 · 내릴 때 3초 / 밀 때 1초 · 무릎 90도까지만, 끝에서 잠그지 않기"},
   {id:"squat", n:"스쿼트", t:"55kg × 20회 × 3세트", w:55, r:20, s:3, rest:90, unit:"kg", warm:{w:30,r:12},
    bench:{type:"bw", v:[0.4,0.7,1.0]},
    spec:"세트간 90초 · 내릴 때 2초 / 올릴 때 1초 · 무릎이 발끝보다 과하게 나가지 않게"},
@@ -319,18 +338,18 @@ const UPPER = [
   {id:"reardelt", n:"리어델토이드", t:"14kg × 15회 × 3세트", w:14, r:15, s:3, rest:75, unit:"kg", warm:{w:9,r:12},
    bench:{type:"bw", v:[0.15,0.28,0.45]},
    spec:"세트간 75초 · 반동 없이, 되돌릴 때 3초"},
-  {id:"pushup", n:"푸시업", t:"18개 × 4세트", w:0, r:18, s:4, rest:90, unit:"개",
+  {id:"pushup", n:"푸시업", t:"18개 × 4세트", w:0, r:18, s:4, rest:90, unit:"개", warm:{w:0,r:8,note:"무릎을 바닥에 대고 8개 — 어깨·팔꿈치 예열"},
    bench:{type:"abs", v:[12,22,35], label:"1세트 개수"},
    spec:"세트간 90초 · 내릴 때 2초 · 팔꿈치 완전히 잠그지 않기"},
-  {id:"curl", n:"아령 컬", t:"3kg × 20회 × 3세트", w:3, r:20, s:3, rest:60, unit:"kg",
+  {id:"curl", n:"아령 컬", t:"3kg × 20회 × 3세트", w:3, r:20, s:3, rest:60, unit:"kg", warm:{w:1,r:15,note:"가벼운 무게로 15회 — 팔꿈치 예열"},
    bench:{type:"abs", v:[5,9,14], label:"한 팔 무게"},
    spec:"세트간 60초 · 팔꿈치 몸통에 고정 · 내릴 때 3초"},
-  {id:"triceps", n:"트라이셉스 익스텐션", t:"3kg × 15회 × 3세트", w:3, r:15, s:3, rest:60, unit:"kg",
+  {id:"triceps", n:"트라이셉스 익스텐션", t:"3kg × 15회 × 3세트", w:3, r:15, s:3, rest:60, unit:"kg", warm:{w:1,r:15,note:"가벼운 무게로 15회 — 팔꿈치 예열"},
    bench:{type:"abs", v:[5,9,14], label:"양손 무게"},
    spec:"세트간 60초 · 팔꿈치 위치 고정 · 머리 뒤로 천천히"}
 ];
 const CORE = [
-  {id:"plank", n:"플랭크", t:"60초 × 3세트", w:0, r:60, s:3, rest:60, unit:"초",
+  {id:"plank", n:"플랭크", t:"60초 × 3세트", w:0, r:60, s:3, rest:60, unit:"초", warm:{w:0,r:20,note:"20초만 먼저 버텨 자세 잡기"},
    bench:{type:"abs", v:[40,75,120], label:"버틴 시간(초)"},
    spec:"세트간 60초 · 엉덩이 처지지 않게"},
   {id:"sideplank", n:"사이드 플랭크", t:"좌우 30초 × 2세트", w:0, r:30, s:2, rest:45, unit:"초",
@@ -454,8 +473,21 @@ if (firebaseConfig.apiKey) {
 }
 function showBanner(m){ const b=document.getElementById("banner"); b.textContent=m; b.hidden=false; }
 async function saveLog(d,data){ if(db) await db.collection(COLLECTION).doc(USER_ID+"_"+d).set(data); else memory[d]=data; }
+let lastLoadError = null;
 async function loadLogs(n){
-  if(db){ const q=await db.collection(COLLECTION).where("user","==",USER_ID).orderBy("date","desc").limit(n||60).get(); return q.docs.map(x=>x.data()); }
+  if(db){
+    lastLoadError = null;
+    try {
+      const q = await db.collection(COLLECTION).orderBy("date","desc").limit((n||60)*2).get();
+      return q.docs.map(x=>x.data())
+        .filter(d => d && d.date && (!d.user || d.user === USER_ID))
+        .slice(0, n||60);
+    } catch(e){
+      lastLoadError = e;
+      console.error("기록 불러오기 실패:", e);
+      throw e;
+    }
+  }
   return Object.values(memory).sort((a,b)=>b.date.localeCompare(a.date));
 }
 async function loadOne(d){ if(db){const x=await db.collection(COLLECTION).doc(USER_ID+"_"+d).get(); return x.exists?x.data():null;} return memory[d]||null; }
@@ -464,7 +496,9 @@ async function loadOne(d){ if(db){const x=await db.collection(COLLECTION).doc(US
    상태
    ═══════════════════════════════════════════════════ */
 const today = new Date();
-const dateKey = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+const toKey = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const todayKey = toKey(today);
+let dateKey = todayKey;                      // 기록을 저장할 날짜 (바꿀 수 있음)
 const realDow = today.getDay();
 let dow = realDow;
 let routine = ROUTINES[dow];
@@ -474,14 +508,51 @@ let started = {};   // exId -> true
 let doneSets = {};  // exId -> n
 let timers = {};
 
-document.getElementById("hdDate").textContent = dateKey;
 function syncHeader(){
+  document.getElementById("hdDate").textContent = dateKey;
+  const past = dateKey !== todayKey;
+  const bar = document.getElementById("pastbar");
+  if (past){
+    const d = new Date(dateKey + "T00:00:00");
+    bar.innerHTML = '<span>' + (dateKey.slice(5).replace("-","월 ")) + '일 (' + DAY_KO[d.getDay()] + ') 기록을 입력하는 중입니다</span>'
+      + '<button type="button" id="backToday">오늘로</button>';
+    bar.hidden = false;
+    document.getElementById("backToday").onclick = ()=> switchDate(todayKey);
+  } else bar.hidden = true;
   document.getElementById("hdDay").textContent = DAY_EN[dow];
   document.getElementById("hdWeek").textContent = DAY_KO[dow]+"요일"+(dow!==realDow?" 루틴":"");
   const hf = document.getElementById("hdFocus");
   hf.textContent = routine.focus;
   hf.classList.toggle("rest", dow===0);
 }
+async function switchDate(key){
+  if (key === dateKey) return;
+  if (doneTotal() > 0 && !confirm("입력 중인 내용이 지워집니다. 날짜를 바꿀까요?")) return;
+  dateKey = key;
+  const d = new Date(key + "T00:00:00");
+  dow = d.getDay();
+  routine = ROUTINES[dow];
+  entry = { user:USER_ID, date:dateKey, dow, focus:routine.focus, exercises:{}, joints:{} };
+  started = {}; doneSets = {}; runDone = false;
+  Object.keys(timers).forEach(stopTimer);
+  clearInterval(runT); runT = null; keepAwake(false);
+  renderDayBar(); syncHeader(); renderToday(); refreshBodyUI();
+  try {
+    const logs = await loadLogs(60);
+    applySuggestions(logs);
+    const mine = logs.find(L => L.date === dateKey);
+    if (restore(mine)){ applySuggestions(logs); toast(dateKey + " 기록을 불러왔습니다"); }
+  } catch(e){}
+}
+function initDatePicker(){
+  const btn = document.getElementById("hdDateBtn"), inp = document.getElementById("datePick");
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = "1";
+  inp.max = todayKey;
+  btn.onclick = ()=>{ inp.value = dateKey; (inp.showPicker ? inp.showPicker() : inp.click()); };
+  inp.onchange = ()=>{ if (inp.value) switchDate(inp.value); };
+}
+
 function renderDayBar(){
   document.getElementById("dayBar").innerHTML = [1,2,3,4,5,6,0].map(d=>
     '<button type="button" data-d="'+d+'" aria-pressed="'+(d===dow)+'"'+(d===realDow?' class="today"':'')+'>'+DAY_KO[d]+'</button>').join("");
@@ -490,6 +561,7 @@ function renderDayBar(){
       const d = +b.dataset.d;
       if (d === dow) return;
       if (doneTotal() > 0 && !confirm("진행 중인 세트 기록이 지워집니다. 루틴을 바꿀까요?")) return;
+      /* 루틴만 바꾸는 것 — 저장 날짜는 그대로 유지됩니다 */
       dow = d; routine = ROUTINES[d];
       entry.dow = d; entry.focus = routine.focus;
       entry.exercises = {}; started = {}; doneSets = {}; runDone = false;
@@ -497,6 +569,58 @@ function renderDayBar(){
       renderDayBar(); syncHeader(); renderToday();
     };
   });
+}
+
+/* 헤더 체중 — 눌러서 수정 */
+function refreshBodyUI(){
+  const v = document.getElementById("hdBodyVal");
+  if (v) v.textContent = bodyKg;
+  routine.ex.forEach(ex=>{
+    const box = document.querySelector('[data-bench="'+ex.id+'"]');
+    if (!box) return;
+    const b = benchValues(ex), u = ex.unit==="kg"?"kg":ex.unit;
+    const hd = box.querySelector(".bench-hd span:last-child");
+    if (hd) hd.textContent = "체중 "+bodyKg+"kg 기준";
+    const keys = box.querySelectorAll(".bar-key span");
+    ["입문","평균","숙련"].forEach((k,i)=>{ if(keys[i]) keys[i].textContent = k+" "+b[i]+u; });
+    updateBench(ex);
+  });
+}
+function initBodyChip(){
+  const chip = document.getElementById("hdBody");
+  if (!chip || chip.dataset.bound) return;
+  chip.dataset.bound = "1";
+  chip.onclick = ()=>{
+    if (chip.classList.contains("editing")) return;
+    chip.classList.add("editing");
+    chip.innerHTML = '체중 <input type="number" inputmode="numeric" id="bodyInput" value="'+bodyKg+'" min="30" max="200">kg';
+    const inp = chip.querySelector("input");
+    inp.focus(); inp.select();
+    let dy0 = null, start = 0;
+    inp.addEventListener("pointerdown", e=>{ dy0 = e.clientY; start = +inp.value||bodyKg; inp.setPointerCapture(e.pointerId); });
+    inp.addEventListener("pointermove", e=>{
+      if (dy0 === null) return;
+      const d = dy0 - e.clientY;
+      if (Math.abs(d) < 4) return;
+      inp.blur();
+      inp.value = Math.min(200, Math.max(30, start + Math.round(d/9)));
+      e.preventDefault();
+    });
+    const end = ()=>{ dy0 = null; };
+    inp.addEventListener("pointerup", end);
+    inp.addEventListener("pointercancel", end);
+    const commit = ()=>{
+      const v = Math.min(200, Math.max(30, +inp.value || bodyKg));
+      bodyKg = v;
+      chip.classList.remove("editing");
+      chip.innerHTML = '체중 <b id="hdBodyVal">'+bodyKg+'</b>kg <span class="pen">✎</span>';
+      refreshBodyUI();
+      if (db) db.collection(COLLECTION).doc(USER_ID+"_settings").set({bodyKg:v},{merge:true}).catch(()=>{});
+      toast("체중 "+v+"kg 기준으로 참고치를 다시 계산했습니다");
+    };
+    inp.addEventListener("blur", ()=>{ if (dy0 === null) commit(); });
+    inp.addEventListener("keydown", e=>{ if (e.key === "Enter") inp.blur(); });
+  };
 }
 
 function totalSets(){ return routine.ex.reduce((a,e)=> a + (getVal(e.id,"s")||e.s) + (e.warm?1:0), 0) + (routine.run?1:0); }
@@ -601,7 +725,7 @@ function renderToday(){
   if (dow === 0){
     h += '<div class="card"><div class="card-bd"><h3 style="font-size:16px;margin-bottom:6px">오늘은 완전 휴식</h3>'
       + '<p class="spec" style="font-size:13px">근력·러닝 모두 쉬는 날입니다. 회복이 다음 주 강도를 결정해요. 관절에 남은 뻐근함이 있으면 아래에 기록해두면 다음 주 무게 판단에 씁니다.</p></div></div>';
-    h += jointBlock() + '<button class="save" id="btnSave">오늘 기록 저장</button>';
+    h += jointBlock() + '<button class="save" id="btnSave">' + (dateKey===todayKey ? "오늘" : dateKey.slice(5).replace("-","/")) + ' 기록 저장</button>';
     el.innerHTML = h; bindToday(); updateProgress(); return;
   }
   if (routine.run){
@@ -638,7 +762,6 @@ function renderToday(){
       h += '<div class="card" data-ex="'+ex.id+'">'
         + '<div class="card-hd"><h3><span data-check></span>'+ex.n+'</h3><span class="ex-target">'+ex.t+'</span></div>'
         + '<div class="card-bd">'
-        +   '<p class="spec" style="margin:0 0 12px">'+ex.spec+'</p>'
         +   '<div class="fields"'+(ex.w?'':' style="grid-template-columns:1fr 1fr"')+'>'
         +     (ex.w ? stepper("w", ex.w, 0, 300, "무게 kg") : '')
         +     stepper("r", ex.r, 1, 300, unit)
@@ -648,6 +771,7 @@ function renderToday(){
         +   benchBlock(ex)
         +   '<div data-setzone></div>'
         +   scaleBlock(ex.id)
+        +   '<p class="spec" style="margin:13px 0 0;padding-top:11px;border-top:1px solid #EFEFEA">'+ex.spec+'</p>'
         +   howtoInline(ex.id)
         + '</div></div>';
     });
@@ -666,7 +790,9 @@ function renderToday(){
          + '<div class="tip">'+x.tip+'</div></div></details>';
       }).join("")
     + '</div>';
-  h += jointBlock() + '<button class="save" id="btnSave">오늘 기록 저장</button>' + settingsBlock();
+  h += jointBlock()
+    + '<button class="save" id="btnSave">' + (dateKey===todayKey ? "오늘" : dateKey.slice(5).replace("-","/")) + ' 기록 저장</button>'
+    + settingsBlock();
   el.innerHTML = h;
   bindToday();
   routine.ex.forEach(ex=>{ renderSetZone(ex); updateBench(ex); });
@@ -690,7 +816,9 @@ function renderSetZone(ex){
   const done = doneSets[ex.id] || 0;
   if (!started[ex.id]){
     zone.innerHTML = '<button class="startbtn" data-start>'+ex.n+(ex.warm?' — 워밍업부터 시작':' 시작')+'</button>'
-      + (ex.warm ? '<p class="drag-hint" style="margin:-6px 0 12px">워밍업 '+ex.warm.w+'kg × '+ex.warm.r+'회 → 본 세트</p>' : '');
+      + (ex.warm ? '<p class="drag-hint" style="margin:-6px 0 12px">워밍업: '
+          + (ex.warm.note ? ex.warm.note : ex.warm.w+'kg × '+ex.warm.r+'회')
+          + ' → 본 세트</p>' : '');
     zone.querySelector("[data-start]").onclick = ()=>{ started[ex.id]=true; doneSets[ex.id]=0; renderSetZone(ex); card.classList.add("active"); };
     return;
   }
@@ -725,7 +853,9 @@ function renderSetZone(ex){
         stopTimer(ex.id);
         if (routine.ex.every(e => (doneSets[e.id]||0) >= (getVal(e.id,"s")||e.s))) toast(pick(REACT_DONE));
       } else if (isWarm) {
-        msg.innerHTML = '<div class="react">워밍업 완료. 이제 본 무게 '+(getVal(ex.id,"w")||ex.w)+'kg로 올리세요.</div>'
+        const w = getVal(ex.id,"w") || ex.w;
+        msg.innerHTML = '<div class="react">워밍업 완료. '
+          + (w ? '이제 본 무게 '+w+'kg로 올리세요.' : '이제 본 세트로 들어갑니다.') + '</div>'
           + '<div class="react rest">휴식 <span class="t" data-timer>'+fmt(60)+'</span> — 무게 바꾸고 준비하세요.</div>';
         startTimer(ex.id, 60, card);
       } else {
@@ -817,14 +947,7 @@ function applySuggestions(logs){
 /* 설정 — 체중 */
 function settingsBlock(){
   return '<div class="eyebrow">설정</div><div class="card"><div class="card-bd">'
-   + '<div class="fields" style="grid-template-columns:1fr;margin-bottom:8px">'
-   +   '<div class="f"><label>체중 kg</label><div class="step">'
-   +     '<button type="button" data-step="-1">−</button>'
-   +     '<input type="number" inputmode="numeric" id="bodyInput" value="'+bodyKg+'" min="30" max="200">'
-   +     '<button type="button" data-step="1">+</button></div></div>'
-   + '</div>'
-   + '<p class="drag-hint" style="margin-bottom:10px">숫자를 위아래로 밀면 빠르게 조절됩니다</p>'
-   + '<p class="spec">참고치(입문 · 평균 · 숙련)는 이 체중을 기준으로 계산합니다. 30대 남성 일반 헬스 이용자의 대략적인 범위이고 기계 종류에 따라 실제 값은 달라지니 방향만 참고하세요. 최종 기준은 참고치가 아니라 관절 반응입니다.</p>'
+   + '<p class="spec">체중은 화면 오른쪽 위 <b>체중 '+bodyKg+'kg ✎</b>를 눌러 바꿉니다. 참고치(입문 · 평균 · 숙련)는 이 체중을 기준으로 계산합니다. 30대 남성 일반 헬스 이용자의 대략적인 범위이고 기계 종류에 따라 실제 값은 달라지니 방향만 참고하세요. 최종 기준은 참고치가 아니라 관절 반응입니다.</p>'
    + '<h3 style="font-size:13px;margin:14px 0 5px">하지 않는 동작</h3>'
    + '<p class="spec">런지 · 버피 · 점프 스쿼트 · 박스 점프처럼 착지 충격이 있는 동작, 12 km/h 이상 스프린트, 경사 5% 이상 러닝은 루틴에서 제외합니다.</p>'
    + '</div></div>';
@@ -1008,32 +1131,20 @@ function bindToday(){
       };
     });
   });
-  /* 체중 설정 */
-  const bi = document.getElementById("bodyInput");
-  if (bi) bi.addEventListener("change", ()=>{
-    const v = Math.min(200, Math.max(30, +bi.value||70));
-    bi.value = v; bodyKg = v;
-    routine.ex.forEach(ex=>{
-      const box = document.querySelector('[data-bench="'+ex.id+'"]');
-      if (box){
-        const b = benchValues(ex), u = ex.unit==="kg"?"kg":ex.unit;
-        box.querySelector(".bench-hd span:last-child").textContent = "체중 "+bodyKg+"kg 기준";
-        const keys = box.querySelectorAll(".bar-key span");
-        ["입문","평균","숙련"].forEach((k,i)=>{ if(keys[i]) keys[i].textContent = k+" "+b[i]+u; });
-        updateBench(ex);
-      }
-    });
-    if (db) db.collection(COLLECTION).doc(USER_ID+"_settings").set({bodyKg:v},{merge:true}).catch(()=>{});
-  });
-
   /* 저장 */
   const btn = document.getElementById("btnSave");
   if (btn) btn.onclick = async ()=>{
     collect();
+    const label = btn.textContent;
     btn.disabled = true; btn.textContent = "저장 중…";
     try { await saveLog(dateKey, JSON.parse(JSON.stringify(entry))); toast("저장했습니다"); }
-    catch(e){ console.error(e); toast("저장 실패 — 연결을 확인하세요"); }
-    btn.disabled = false; btn.textContent = "오늘 기록 저장";
+    catch(e){
+      console.error(e);
+      toast(e && e.code === "permission-denied"
+        ? "저장 실패 — Firestore 규칙에 workout_logs 허용이 필요합니다"
+        : "저장 실패 — 연결을 확인하세요");
+    }
+    btn.disabled = false; btn.textContent = label;
   };
 }
 
@@ -1112,7 +1223,16 @@ function restore(prev){
 async function renderLog(){
   const el = document.getElementById("pane-log");
   el.innerHTML = '<p class="empty">불러오는 중…</p>';
-  let logs = []; try { logs = await loadLogs(60); } catch(e){ console.error(e); }
+  let logs = [], err = null;
+  try { logs = await loadLogs(60); } catch(e){ err = e; }
+  if (err){
+    el.innerHTML = '<div class="card"><div class="card-bd">'
+      + '<h3 style="font-size:14px;margin-bottom:6px;color:var(--alert)">기록을 불러오지 못했습니다</h3>'
+      + '<p class="spec">' + (err.code === "permission-denied"
+          ? 'Firebase 콘솔 → Firestore → 규칙에 <b>workout_logs</b> 컬렉션 허용을 추가하고 게시해야 합니다.'
+          : '오류: ' + (err.code || err.message || '알 수 없음')) + '</p></div></div>';
+    return;
+  }
   if (!logs.length){ el.innerHTML = '<p class="empty">아직 기록이 없습니다.<br>오늘 탭에서 첫 운동을 저장해 보세요.</p>'; return; }
   el.innerHTML = '<div class="eyebrow">최근 '+logs.length+'일</div><div class="log">' + logs.map(L=>{
     const ex = Object.values(L.exercises||{});
@@ -1130,7 +1250,9 @@ let trendLogs = null;
 async function renderTrend(){
   const el = document.getElementById("pane-trend");
   el.innerHTML = '<p class="empty">불러오는 중…</p>';
-  try { trendLogs = await loadLogs(60); } catch(e){ trendLogs = []; }
+  let terr = null;
+  try { trendLogs = await loadLogs(60); } catch(e){ trendLogs = []; terr = e; }
+  if (terr){ el.innerHTML = '<p class="empty">기록을 불러오지 못했습니다.<br>기록 탭에서 자세한 원인을 확인하세요.</p>'; return; }
   if (!trendLogs.length){ el.innerHTML = '<p class="empty">기록이 쌓이면 무게와 강도 변화를 여기서 볼 수 있습니다.</p>'; return; }
   const ids = [...new Set(trendLogs.flatMap(L=>Object.keys(L.exercises||{})))];
   el.innerHTML = '<div class="eyebrow">종목별 추세</div><select id="trendSel">'
@@ -1220,7 +1342,8 @@ async function boot(){
       if (d.exists && d.data().bodyKg) bodyKg = d.data().bodyKg;
     }
   } catch(e){}
-  renderDayBar(); syncHeader(); renderToday();
+  initDatePicker();
+  renderDayBar(); syncHeader(); initBodyChip(); renderToday(); refreshBodyUI();
   try {
     const logs = await loadLogs(60);
     applySuggestions(logs);
