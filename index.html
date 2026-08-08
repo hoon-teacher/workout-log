@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>운동 기록</title>
 <meta name="theme-color" content="#16181D">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,8 +22,10 @@
   --grid:rgba(22,24,29,.055);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
 html,body{margin:0;padding:0}
 body{
+  touch-action:manipulation;   /* 더블탭 확대 방지 */
   background:var(--paper);
   background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
   background-size:22px 22px;
@@ -185,6 +187,13 @@ section[hidden]{display:none}
 .chip.ok{background:#E4F0EA;color:var(--ok)}
 .chip.warn{background:#FBEEDA;color:var(--caution)}
 .chip.bad{background:#FBE6E3;color:var(--alert)}
+.log-actions{display:flex;gap:6px;margin:8px 0 2px}
+.log-actions button{border:1px solid var(--line);background:#fff;color:var(--ink-3);border-radius:2px;padding:5px 10px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
+.log-actions button.edit{border-color:var(--signal);color:var(--signal)}
+.log-actions button.del{border-color:#E2B4AE;color:var(--alert)}
+.log-row{position:relative}
+.log-row .x{border:0;background:none;color:#C9CCC4;font-size:15px;line-height:1;padding:0 0 0 8px;cursor:pointer;flex:none}
+.log-row .x:active{color:var(--alert)}
 .empty{text-align:center;color:var(--ink-3);font-size:13px;padding:44px 20px;line-height:1.7}
 select{width:100%;padding:10px;border:1px solid var(--line);border-radius:2px;background:#FBFBF9;font-family:inherit;font-size:14px;color:var(--ink)}
 .trend svg{width:100%;height:150px;display:block;margin-top:10px}
@@ -240,13 +249,17 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
 .step.dragging input{color:var(--signal)}
 .drag-hint{font-size:9.5px;color:var(--ink-3);text-align:center;margin-top:3px}
 .dow-note{margin:8px 0 0;font-size:11px;color:#E0A422;line-height:1.4}
+.swapbtn{border:1px solid var(--line);background:#fff;color:var(--ink-3);border-radius:2px;padding:3px 8px;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:0;cursor:pointer;text-transform:none;margin-left:2px}
+.eyebrow:has(.swapbtn)::after{order:-1}
 .modebar{display:flex;gap:4px;margin-top:12px;padding:3px;background:#22262E;border-radius:3px}
 .modebar button{flex:1;border:0;background:transparent;color:#8A919C;border-radius:2px;padding:8px 0;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .modebar button[aria-pressed="true"]{background:#fff;color:var(--ink)}
 .daybar{display:flex;gap:4px;margin-top:12px}
 .daybar button{flex:1;border:1px solid #363B44;background:transparent;color:#A8AEB8;border-radius:2px;padding:6px 0;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
 .daybar button[aria-pressed="true"]{background:#fff;border-color:#fff;color:var(--ink)}
-.daybar button.today::after{content:"·";display:block;line-height:0;margin-top:3px;font-size:15px}
+.daybar button i{display:block;font-style:normal;font-family:'JetBrains Mono',monospace;font-size:10px;opacity:.7;margin-top:2px}
+.daybar button.today{border-color:#5A626E}
+.daybar button.today::after{content:"오늘";display:block;font-size:8px;letter-spacing:.04em;opacity:.75;margin-top:1px}
 .donebtn{width:100%;padding:11px;border:1px solid var(--ok);background:#fff;color:var(--ok);border-radius:3px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px}
 .donebtn[aria-pressed="true"]{background:var(--ok);color:#fff}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -281,7 +294,7 @@ details.card[open]>summary{border-bottom:1px solid var(--line);background:#FBFBF
       <button type="button" data-m="travel" aria-pressed="false">여행</button>
     </div>
     <div class="daybar" id="dayBar"></div>
-    <p id="dowNote" class="dow-note" hidden>다른 요일 루틴을 보는 중입니다. 저장은 위의 날짜로 들어갑니다.</p>
+    <p id="dowNote" class="dow-note" hidden></p>
     <div class="hd-prog"><i id="progBar"></i></div>
     <div class="hd-prog-lbl"><span id="progTxt">시작 전</span><span class="mono" id="progNum">0 / 0</span></div>
   </div>
@@ -658,6 +671,18 @@ async function loadLogs(n){
   }
   return Object.values(memory).sort((a,b)=>b.date.localeCompare(a.date));
 }
+async function deleteLog(d){
+  if (db) await db.collection(COLLECTION).doc(USER_ID+"_"+d).delete();
+  else delete memory[d];
+}
+async function deleteExercise(d, exId){
+  const prev = await loadOne(d);
+  if (!prev) return;
+  if (prev.exercises) delete prev.exercises[exId];
+  if (exId === "__run") delete prev.run;
+  if (db) await db.collection(COLLECTION).doc(USER_ID+"_"+d).set(prev);
+  else memory[d] = prev;
+}
 async function loadOne(d){ if(db){const x=await db.collection(COLLECTION).doc(USER_ID+"_"+d).get(); return x.exists?x.data():null;} return memory[d]||null; }
 
 /* ═══════════════════════════════════════════════════
@@ -681,18 +706,23 @@ function syncHeader(){
   document.getElementById("hdDate").textContent = dateKey;
   const trueDow = new Date(dateKey + "T00:00:00").getDay();
   const noteEl = document.getElementById("dowNote");
-  if (noteEl) noteEl.hidden = (dow === trueDow);
+  if (noteEl){
+    if (dow === trueDow) noteEl.hidden = true;
+    else { noteEl.hidden = false; noteEl.textContent = DAY_KO[trueDow]+"요일이지만 "+DAY_KO[dow]+"요일 루틴("+routine.focus+")으로 하는 중입니다."; }
+  }
   const past = dateKey !== todayKey;
   const bar = document.getElementById("pastbar");
   if (past){
     const d = new Date(dateKey + "T00:00:00");
-    bar.innerHTML = '<span>' + (dateKey.slice(5).replace("-","월 ")) + '일 (' + DAY_KO[d.getDay()] + ') 기록을 입력하는 중입니다</span>'
+    bar.innerHTML = '<span>' + (dateKey.slice(5).replace("-","월 ")) + '일 (' + DAY_KO[d.getDay()] + ') 기록 입력 중</span>'
       + '<button type="button" id="backToday">오늘로</button>';
     bar.hidden = false;
     document.getElementById("backToday").onclick = ()=> switchDate(todayKey);
   } else bar.hidden = true;
-  document.getElementById("hdDay").textContent = DAY_EN[dow];
-  document.getElementById("hdWeek").textContent = DAY_KO[dow]+"요일"+(dow!==realDow?" 루틴":"");
+  const wd = new Date(dateKey + "T00:00:00").getDay();
+  document.getElementById("hdWeek").textContent = DAY_KO[wd]+"요일"
+    + (dateKey === todayKey ? " (오늘)" : "");
+  document.getElementById("hdDay").textContent = DAY_EN[wd];
   const hf = document.getElementById("hdFocus");
   hf.textContent = routine.focus;
   hf.classList.toggle("rest", dow===0);
@@ -702,7 +732,7 @@ async function switchDate(key){
   if (doneTotal() > 0 && !confirm("입력 중인 내용이 지워집니다. 날짜를 바꿀까요?")) return;
   dateKey = key;
   const d = new Date(key + "T00:00:00");
-  dow = d.getDay();
+  dow = d.getDay();   // 날짜의 실제 요일 루틴으로
   routine = PLANS[mode][dow];
   entry = { user:USER_ID, date:dateKey, dow, mode, focus:routine.focus, exercises:{}, joints:{} };
   started = {}; doneSets = {}; runDone = false;
@@ -746,21 +776,22 @@ function renderModeBar(){
   });
 }
 
+/* 최근 7일 — 버튼을 누르면 그 날짜로 이동합니다 */
+function last7(){
+  const out = [];
+  for (let i=6;i>=0;i--){
+    const d = new Date(today); d.setDate(d.getDate()-i);
+    out.push({ key: toKey(d), dow: d.getDay(), day: d.getDate() });
+  }
+  return out;
+}
 function renderDayBar(){
-  document.getElementById("dayBar").innerHTML = [1,2,3,4,5,6,0].map(d=>
-    '<button type="button" data-d="'+d+'" aria-pressed="'+(d===dow)+'"'+(d===realDow?' class="today"':'')+'>'+DAY_KO[d]+'</button>').join("");
+  document.getElementById("dayBar").innerHTML = last7().map(o=>
+    '<button type="button" data-key="'+o.key+'" aria-pressed="'+(o.key===dateKey)+'"'
+    + (o.key===todayKey?' class="today"':'') + '>'
+    + DAY_KO[o.dow] + '<i>' + o.day + '</i></button>').join("");
   document.querySelectorAll("#dayBar button").forEach(b=>{
-    b.onclick = ()=>{
-      const d = +b.dataset.d;
-      if (d === dow) return;
-      if (doneTotal() > 0 && !confirm("진행 중인 세트 기록이 지워집니다. 루틴을 바꿀까요?")) return;
-      /* 루틴만 바꾸는 것 — 저장 날짜는 그대로 유지됩니다 */
-      dow = d; routine = PLANS[mode][d];
-      entry.dow = d; entry.focus = routine.focus;
-      entry.exercises = {}; started = {}; doneSets = {}; runDone = false;
-      Object.keys(timers).forEach(stopTimer);
-      renderDayBar(); syncHeader(); renderToday();
-    };
+    b.onclick = ()=> switchDate(b.dataset.key);
   });
 }
 
@@ -950,7 +981,8 @@ function renderToday(){
       + '</div></div>';
   }
   if (routine.ex.length){
-    h += '<div class="eyebrow">'+routine.focus+' · '+routine.ex.length+'종목</div>';
+    h += '<div class="eyebrow">'+routine.focus+' · '+routine.ex.length+'종목'
+      + '<button type="button" id="swapRoutine" class="swapbtn">루틴 바꾸기</button></div>';
     routine.ex.forEach(ex=>{
       const unit = ex.unit === "kg" ? "회" : ex.unit;   // 분·초·개는 그대로
       h += '<div class="card" data-ex="'+ex.id+'">'
@@ -990,6 +1022,24 @@ function renderToday(){
   el.innerHTML = h;
   bindToday();
   routine.ex.forEach(ex=>{ renderSetZone(ex); updateBench(ex); });
+  const swap = document.getElementById("swapRoutine");
+  if (swap) swap.onclick = ()=>{
+    const opts = [1,2,3,6].map(d=>DAY_KO[d]+" — "+PLANS[mode][d].focus);
+    const cur = [1,2,3,6].indexOf(dow);
+    const pick = prompt("어떤 루틴으로 할까요? 번호를 입력하세요.\n\n"
+      + opts.map((o,i)=>(i+1)+". "+o).join("\n"), String(cur>=0?cur+1:1));
+    if (!pick) return;
+    const d = [1,2,3,6][(+pick)-1];
+    if (d === undefined || d === dow) return;
+    if (doneTotal() > 0 && !confirm("진행 중인 세트 기록이 지워집니다. 바꿀까요?")) return;
+    dow = d; routine = PLANS[mode][d];
+    entry.dow = d; entry.focus = routine.focus; entry.exercises = {};
+    started = {}; doneSets = {}; runDone = false;
+    Object.keys(timers).forEach(stopTimer);
+    clearInterval(runT); runT = null; keepAwake(false);
+    syncHeader(); renderToday(); refreshBodyUI();
+    loadLogs(60).then(applySuggestions).catch(()=>{});
+  };
   if (routine.run) initRunner(RUN[routine.run]);
   const rb = document.getElementById("runDone");
   if (rb) rb.onclick = ()=>{
@@ -1440,13 +1490,67 @@ async function renderLog(){
     const worst = Math.max(0, ...Object.values(L.joints||{}));
     const chip = worst>=2 ? '<span class="chip bad">'+JOINT_OPT[worst]+'</span>' : worst===1 ? '<span class="chip warn">뻐근함</span>' : '<span class="chip ok">관절 이상 없음</span>';
     const run = L.run && L.run.km ? '<div class="log-row"><span>러닝</span><span class="v">'+L.run.km+'km · '+L.run.min+'분'+(L.runRpe?" · 강도 "+L.runRpe:"")+'</span></div>' : "";
-    return '<div class="log-item"><span class="log-date">'+L.date+'</span><span class="log-focus">'+DAY_KO[L.dow]+' · '+L.focus+'</span>'+chip
-      + '<div class="log-rows">'+run+ex.map(e=>'<div class="log-row"><span>'+(e.name||"")+'</span><span class="v">'
-      + (e.weight?e.weight+"kg · ":"")+e.reps+"×"+(e.doneSets===undefined?e.sets:e.doneSets)
-      + (e.doneSets!==undefined&&e.doneSets<e.sets?" (계획 "+e.sets+")":"")
-      + (e.rpe?" · 강도 "+e.rpe:"")+'</span></div>').join("")+'</div></div>';
+    const ids = Object.keys(L.exercises||{});
+    return '<div class="log-item" data-date="'+L.date+'"><span class="log-date">'+L.date+'</span><span class="log-focus">'+DAY_KO[L.dow]+' · '+L.focus+'</span>'+chip
+      + '<div class="log-rows">'
+      + (run ? run.replace('</div>','<button class="x" data-del-ex="__run" title="러닝 기록 삭제">×</button></div>') : "")
+      + ex.map((e,i)=>'<div class="log-row"><span>'+(e.name||"")+'</span><span class="v">'
+        + (e.weight?e.weight+"kg · ":"")+e.reps+"×"+(e.doneSets===undefined?e.sets:e.doneSets)
+        + (e.doneSets!==undefined&&e.doneSets<e.sets?" (계획 "+e.sets+")":"")
+        + (e.rpe?" · 강도 "+e.rpe:"")+'</span>'
+        + '<button class="x" data-del-ex="'+ids[i]+'" title="이 종목 삭제">×</button></div>').join("")
+      + '</div>'
+      + '<div class="log-actions">'
+      +   '<button class="edit" data-edit="'+L.date+'">이 날 수정하기</button>'
+      +   '<button class="del" data-del-day="'+L.date+'">이 날 전체 삭제</button>'
+      + '</div></div>';
   }).join("") + '</div>';
+  bindLogActions();
 }
+function bindLogActions(){
+  /* 이 날 수정하기 → 오늘 탭에서 그 날짜를 열고 값 불러오기 */
+  document.querySelectorAll("[data-edit]").forEach(b=>{
+    b.onclick = async ()=>{
+      const key = b.dataset.edit;
+      document.querySelector('nav button[data-p="today"]').click();
+      await switchDate(key);
+      toast(key + " 기록을 불러왔습니다 — 고친 뒤 저장하세요");
+    };
+  });
+  /* 하루 전체 삭제 */
+  document.querySelectorAll("[data-del-day]").forEach(b=>{
+    b.onclick = async ()=>{
+      const key = b.dataset.delDay;
+      if (!confirm(key + " 기록을 전부 삭제할까요? 되돌릴 수 없습니다.")) return;
+      b.disabled = true; b.textContent = "삭제 중…";
+      try {
+        await deleteLog(key);
+        if (key === dateKey){
+          entry = { user:USER_ID, date:dateKey, dow, mode, focus:routine.focus, exercises:{}, joints:{} };
+          started = {}; doneSets = {}; runDone = false;
+        }
+        toast(key + " 기록을 삭제했습니다");
+        renderLog();
+      } catch(e){ console.error(e); toast("삭제 실패 — 연결을 확인하세요"); b.disabled = false; b.textContent = "이 날 전체 삭제"; }
+    };
+  });
+  /* 종목 하나 삭제 */
+  document.querySelectorAll("[data-del-ex]").forEach(b=>{
+    b.onclick = async ()=>{
+      const item = b.closest(".log-item"), key = item.dataset.date;
+      const exId = b.dataset.delEx;
+      const label = exId === "__run" ? "러닝" : (b.parentElement.querySelector("span").textContent);
+      if (!confirm(key + " 의 " + label + " 기록을 삭제할까요?")) return;
+      try {
+        await deleteExercise(key, exId);
+        if (key === dateKey && entry.exercises) delete entry.exercises[exId];
+        toast(label + " 기록을 삭제했습니다");
+        renderLog();
+      } catch(e){ console.error(e); toast("삭제 실패 — 연결을 확인하세요"); }
+    };
+  });
+}
+
 let trendLogs = null;
 async function renderTrend(){
   const el = document.getElementById("pane-trend");
@@ -1534,6 +1638,16 @@ document.querySelectorAll("nav button").forEach(b=>{
     if (b.dataset.p !== "today") panes[b.dataset.p]();
   };
 });
+/* iOS 더블탭·핀치 확대 차단 */
+document.addEventListener("gesturestart", e=>e.preventDefault(), {passive:false});
+document.addEventListener("gesturechange", e=>e.preventDefault(), {passive:false});
+let lastTap = 0;
+document.addEventListener("touchend", e=>{
+  const now = Date.now();
+  if (now - lastTap < 320 && e.cancelable) e.preventDefault();
+  lastTap = now;
+}, {passive:false});
+
 function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove("on"),2600); }
 
 async function boot(){
